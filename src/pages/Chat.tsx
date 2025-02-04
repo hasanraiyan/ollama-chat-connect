@@ -4,10 +4,15 @@ import { Preferences } from '@capacitor/preferences';
 import { Toast } from '@capacitor/toast';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+}
+
+interface OllamaResponse {
+  message: string;
 }
 
 const Chat = () => {
@@ -16,6 +21,7 @@ const Chat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [serverUrl, setServerUrl] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -55,12 +61,14 @@ const Chat = () => {
   const sendMessage = async () => {
     if (!input.trim() || !serverUrl || !selectedModel) return;
 
-    const userMessage = { role: 'user', content: input.trim() };
+    const userMessage: Message = { role: 'user', content: input.trim() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setError(null);
 
     try {
+      console.log('Sending request to:', `${serverUrl}/api/chat`);
       const response = await fetch(`${serverUrl}/api/chat`, {
         method: 'POST',
         headers: {
@@ -72,15 +80,24 @@ const Chat = () => {
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to get response');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      const data = await response.json();
+      const data: OllamaResponse = await response.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
     } catch (error) {
       console.error('Error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(errorMessage);
+      
+      if (errorMessage.includes('Failed to fetch')) {
+        setError('Unable to connect to the Ollama server. Please check:\n1. The server URL is correct\n2. The server is running\n3. CORS is enabled on the server');
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to get response from Ollama server",
+        description: "Failed to get response from Ollama server. Check console for details.",
         variant: "destructive",
       });
     } finally {
@@ -120,6 +137,16 @@ const Chat = () => {
           </svg>
         </button>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" className="m-4">
+          <AlertTitle>Connection Error</AlertTitle>
+          <AlertDescription className="whitespace-pre-line">
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
