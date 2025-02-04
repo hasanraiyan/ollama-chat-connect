@@ -12,7 +12,9 @@ interface Message {
 }
 
 interface OllamaResponse {
-  message: string;
+  message: {
+    content: string;
+  };
 }
 
 const Chat = () => {
@@ -76,7 +78,10 @@ const Chat = () => {
         },
         body: JSON.stringify({
           model: selectedModel,
-          messages: [...messages, userMessage],
+          messages: [{
+            role: "user",
+            content: userMessage.content
+          }],
         }),
       });
 
@@ -84,8 +89,23 @@ const Chat = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data: OllamaResponse = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let data: OllamaResponse;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('JSON Parse Error:', e);
+        throw new Error(`Failed to parse response: ${e.message}`);
+      }
+
+      if (!data.message || typeof data.message.content !== 'string') {
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid response format from server');
+      }
+
+      setMessages(prev => [...prev, { role: 'assistant', content: data.message.content }]);
     } catch (error) {
       console.error('Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -105,9 +125,10 @@ const Chat = () => {
     }
   };
 
+  // ... keep existing code (render JSX)
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Header */}
       <div className="flex justify-between items-center p-4 backdrop-blur-lg bg-white/80 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
         <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
           Chat with {selectedModel || 'AI'}
@@ -138,7 +159,6 @@ const Chat = () => {
         </button>
       </div>
 
-      {/* Error Alert */}
       {error && (
         <Alert variant="destructive" className="m-4">
           <AlertTitle>Connection Error</AlertTitle>
