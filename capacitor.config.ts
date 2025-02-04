@@ -6,13 +6,21 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     url: 'https://REPLACE_WITH_PROJECT_ID.lovableproject.com?forceHideBadge=true',
-    cleartext: true
+    cleartext: true,
+    allowNavigation: ['*']
   },
   ios: {
-    contentInset: 'automatic'
+    contentInset: 'automatic',
+    limitsNavigationsToAppBoundDomains: false,
+    webViewConfiguration: {
+      allowsBackForwardNavigationGestures: true,
+      allowsLinkPreview: true,
+      mediaTypesRequiringUserActionForPlayback: 'none'
+    }
   },
   android: {
-    allowMixedContent: true
+    allowMixedContent: true,
+    webContentsDebuggingEnabled: true
   }
 };
 
