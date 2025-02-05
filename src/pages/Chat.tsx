@@ -15,6 +15,9 @@ interface OllamaResponse {
   };
 }
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
 const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -29,6 +32,35 @@ const Chat = () => {
   useEffect(() => {
     loadServerConfig();
   }, []);
+
+  const testConnection = async (url: string, retryCount = 0): Promise<boolean> => {
+    try {
+      console.log(`Testing connection to ${url} (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      const response = await fetch(`${url}/api/chat`, {
+        method: 'HEAD',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+      
+      console.log('Connection test successful');
+      return true;
+    } catch (e) {
+      console.error(`Connection test failed (attempt ${retryCount + 1}):`, e);
+      
+      if (retryCount < MAX_RETRIES - 1) {
+        console.log(`Retrying in ${RETRY_DELAY}ms...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return testConnection(url, retryCount + 1);
+      }
+      
+      return false;
+    }
+  };
 
   const loadServerConfig = async () => {
     try {
@@ -50,30 +82,25 @@ const Chat = () => {
         ? url.replace('http:', 'https:')
         : url;
         
-      setServerUrl(finalUrl);
-      setSelectedModel(model);
+      const isConnected = await testConnection(finalUrl);
       
-      // Test connection to server
-      try {
-        const response = await fetch(`${finalUrl}/api/chat`, {
-          method: 'HEAD',
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
-        if (!response.ok) {
-          throw new Error(`Server returned ${response.status}`);
-        }
-      } catch (e) {
-        console.error('Server connection test failed:', e);
-        setError(`Server connection test failed. Please ensure:
+      if (!isConnected) {
+        setError(`Unable to connect to Ollama server. Please ensure:
 1. Ollama server is running (ollama serve --cors)
 2. Server URL is correct and accessible
 3. If using HTTPS, server must also use HTTPS
-4. No firewall is blocking the connection`);
+4. No firewall is blocking the connection
+5. The server URL in settings matches your Ollama server`);
+        return;
       }
+
+      setServerUrl(finalUrl);
+      setSelectedModel(model);
+      setError(null);
+      
     } catch (error) {
       console.error('Error loading config:', error);
+      setError('Failed to load configuration. Please check settings.');
     }
   };
 
@@ -129,12 +156,7 @@ const Chat = () => {
       setError(errorMessage);
       
       if (errorMessage.includes('Failed to fetch')) {
-        setError(`Unable to connect to the Ollama server. Please check:
-1. The server URL is correct and accessible
-2. The server is running with CORS enabled (ollama serve --cors)
-3. If using HTTPS in the app, the server must also use HTTPS
-4. Your network/firewall allows the connection
-5. The server URL in settings matches your Ollama server`);
+        await testConnection(serverUrl); // Test connection again to provide updated status
       }
       
       toast({
