@@ -9,12 +9,6 @@ interface Message {
   content: string;
 }
 
-interface OllamaResponse {
-  message: {
-    content: string;
-  };
-}
-
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
 
@@ -131,10 +125,8 @@ const Chat = () => {
         },
         body: JSON.stringify({
           model: selectedModel,
-          messages: [{
-            role: "user",
-            content: userMessage.content
-          }],
+          messages: messages.concat(userMessage),
+          stream: false
         }),
       });
 
@@ -149,7 +141,10 @@ const Chat = () => {
         throw new Error('Invalid response format from server');
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: data.message.content }]);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: data.message.content 
+      }]);
     } catch (error) {
       console.error('Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -168,8 +163,6 @@ const Chat = () => {
       setIsLoading(false);
     }
   };
-
-  // ... keep existing code (render JSX)
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
