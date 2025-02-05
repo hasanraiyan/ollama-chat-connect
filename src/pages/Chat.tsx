@@ -75,7 +75,13 @@ const Chat = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
         },
+        mode: 'cors',
+        credentials: 'same-origin',
         body: JSON.stringify({
           model: selectedModel,
           messages: [{
@@ -112,7 +118,11 @@ const Chat = () => {
       setError(errorMessage);
       
       if (errorMessage.includes('Failed to fetch')) {
-        setError('Unable to connect to the Ollama server. Please check:\n1. The server URL is correct\n2. The server is running\n3. CORS is enabled on the server');
+        setError(`Unable to connect to the Ollama server. Please check:
+1. The server URL is correct
+2. The server is running
+3. CORS is enabled on the server (run with --cors flag)
+4. If using ngrok, ensure it's configured properly`);
       }
       
       toast({
@@ -168,7 +178,6 @@ const Chat = () => {
         </Alert>
       )}
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
           <div
@@ -204,7 +213,6 @@ const Chat = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 backdrop-blur-lg bg-white/80 dark:bg-gray-800/80 border-t border-gray-200 dark:border-gray-700">
         <div className="flex space-x-2">
           <input
