@@ -4,10 +4,22 @@ import { Preferences } from '@capacitor/preferences';
 import { Toast } from '@capacitor/toast';
 import { useToast } from "@/components/ui/use-toast";
 
+interface OllamaModel {
+  name: string;
+  modified_at: string;
+  size: number;
+  details: {
+    format: string;
+    family: string;
+    parameter_size: string;
+    quantization_level: string;
+  };
+}
+
 const Settings = () => {
   const [serverUrl, setServerUrl] = useState('');
   const [modelName, setModelName] = useState('');
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableModels, setAvailableModels] = useState<OllamaModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -32,7 +44,12 @@ const Settings = () => {
       const response = await fetch(`${url}/api/tags`);
       if (!response.ok) throw new Error('Failed to fetch models');
       const data = await response.json();
-      setAvailableModels(data.models.map((m: any) => m.name));
+      
+      if (!data.models || !Array.isArray(data.models)) {
+        throw new Error('Invalid response format from server');
+      }
+      
+      setAvailableModels(data.models);
     } catch (error) {
       console.error('Error fetching models:', error);
       toast({
@@ -111,8 +128,8 @@ const Settings = () => {
               >
                 <option value="">Select a model</option>
                 {availableModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
+                  <option key={model.name} value={model.name}>
+                    {model.name} ({model.details.parameter_size})
                   </option>
                 ))}
               </select>
