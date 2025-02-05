@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Preferences } from '@capacitor/preferences';
-import { Toast } from '@capacitor/toast';
-import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
@@ -36,8 +34,6 @@ const Chat = () => {
     try {
       const { value: url } = await Preferences.get({ key: 'ollama_server_url' });
       const { value: model } = await Preferences.get({ key: 'ollama_model' });
-      if (url) setServerUrl(url);
-      if (model) setSelectedModel(model);
       
       if (!url || !model) {
         navigate('/settings');
@@ -46,6 +42,35 @@ const Chat = () => {
           description: "Please set up your Ollama server and model first.",
           variant: "destructive",
         });
+        return;
+      }
+
+      // Ensure URL is using HTTPS if the app is served over HTTPS
+      const finalUrl = window.location.protocol === 'https:' 
+        ? url.replace('http:', 'https:')
+        : url;
+        
+      setServerUrl(finalUrl);
+      setSelectedModel(model);
+      
+      // Test connection to server
+      try {
+        const response = await fetch(`${finalUrl}/api/chat`, {
+          method: 'HEAD',
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}`);
+        }
+      } catch (e) {
+        console.error('Server connection test failed:', e);
+        setError(`Server connection test failed. Please ensure:
+1. Ollama server is running (ollama serve --cors)
+2. Server URL is correct and accessible
+3. If using HTTPS, server must also use HTTPS
+4. No firewall is blocking the connection`);
       }
     } catch (error) {
       console.error('Error loading config:', error);
@@ -70,18 +95,13 @@ const Chat = () => {
     setError(null);
 
     try {
-      console.log('Sending request to:', `${serverUrl}/api/chat`);
+      console.log('Sending request to:', serverUrl);
       const response = await fetch(`${serverUrl}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
         },
-        mode: 'cors',
-        credentials: 'same-origin',
         body: JSON.stringify({
           model: selectedModel,
           messages: [{
@@ -95,19 +115,10 @@ const Chat = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const responseText = await response.text();
-      console.log('Raw response:', responseText);
-
-      let data: OllamaResponse;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('JSON Parse Error:', e);
-        throw new Error(`Failed to parse response: ${e.message}`);
-      }
+      const data = await response.json();
+      console.log('Server response:', data);
 
       if (!data.message || typeof data.message.content !== 'string') {
-        console.error('Invalid response format:', data);
         throw new Error('Invalid response format from server');
       }
 
@@ -119,10 +130,11 @@ const Chat = () => {
       
       if (errorMessage.includes('Failed to fetch')) {
         setError(`Unable to connect to the Ollama server. Please check:
-1. The server URL is correct
-2. The server is running
-3. CORS is enabled on the server (run with --cors flag)
-4. If using ngrok, ensure it's configured properly`);
+1. The server URL is correct and accessible
+2. The server is running with CORS enabled (ollama serve --cors)
+3. If using HTTPS in the app, the server must also use HTTPS
+4. Your network/firewall allows the connection
+5. The server URL in settings matches your Ollama server`);
       }
       
       toast({
